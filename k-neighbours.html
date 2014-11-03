@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      margin: auto;
+      width: 960px;
+      font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif; 
+      font-weight: 200;
+    }
+
+    text {
+      font: 10px sans-serif;
+    }
+
+    h1, h3 {
+      font-weight: 100;
+    }
+
+    h1 {
+      font-size: 30pt;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    #scatter-load .line {
+      fill: none;
+      stroke: url(#temperature-gradient);
+      stroke-width: 1.5px;
+    }
+
+    form {
+      font-size: 20pt;
+    }
+
+    input, input[type="button"] {
+      padding: 20px;
+      outline: none;
+    }
+
+  </style>
+  <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script>
+    $(document).ready(function(){
+      $('#b').click(function(){
+        $('#o').html('Result: '+naiveClosest($('#k').val(),$('#x').val(),$('#y').val()));
+      });
+    });
+  </script>
+</head>
+<body>
+  <h1>K-Nearest Neighbour</h1>
+  <form>
+    <label>K:</label>
+    <input id="k" max="500" placeholder="1" type="number"/>
+    <label>Point X:</label>
+    <input id="x" type="number" max="1" min="-1" step="0.1">
+    <label>Point Y:</label>
+    <input id="y" type="number" max="1" min="-1" step="0.1">
+    <input id="b" type="button" value="Calculate Value">
+    <h2 id="o"></h2>
+  </form>
+
+  <h1>Plot</h1>
+  <i>Each point is a linear radial gradient</i>
+  <div id="scatter-load"></div>
+  <h1>Error vs K value</h1>
+  <i>min(err): 0.032 when k = 15</i>
+
+  <script src="trainxy.js"></script>
+  <script src="trainc.js"></script>
+  <script src="testxy.js"></script>
+  <script src="testc.js"></script>
+  <script src="d3-master/d3.min.js"></script>
+  <script> 
+
+function naiveClosest(k, xCoord, yCoord){
+  // k shortest distances
+  var minDist = [];
+  for(var i = 0; i < pairs.length; i++){
+    var currDist = Math.sqrt(Math.pow((pairs[i][0]-xCoord),2)+Math.pow((pairs[i][1]-yCoord),2));
+    if(minDist.length < k){
+      minDist.push([currDist, pairs[i][2]]);
+    }
+    else if(minDist.maxFirst() > currDist) {
+      var pos = minDist.findFirst(minDist.maxFirst());
+      if(pos == -1)
+        console.error('Oops?');
+      else {
+        minDist[pos] = [currDist,pairs[i][2]];
+      }
+    }
+  }
+  
+  var posTally = 0;
+  var negTally = 0;
+  var tieBreaker = minDist[0] || [Infinity,1];
+  for(var j = 0; j < minDist.length; j++){
+    if(minDist[j][1] == -1) negTally++;
+    else posTally++;
+    if(minDist[j][0] < tieBreaker[0])
+      tieBreaker = minDist[j]
+  }
+
+  if(posTally > negTally) return 1
+  else if(negTally > posTally) return -1
+  else return tieBreaker[1] || 1;
+}
+
+Array.prototype.maxFirst = function() {
+  var mins = -1;
+  for(var i = 0; i < this.length; i++){
+    if(this[i][0] > mins){
+      mins = this[i][0];
+    }
+  }
+  return mins;
+};
+
+Array.prototype.findFirst = function(searchElement) {
+  
+  if (this == null) {
+    throw new TypeError('"this" is null or not defined');
+  }
+
+  var O = this;
+
+  var len = O.length;
+
+  if (len === 0) {
+    return -1;
+  }
+
+  var k = 0;
+
+  // 9. Repeat, while k < len
+  while (k < len) {
+   if (O[k][0] == searchElement) {
+     return k;
+   }
+   k++;
+  }
+  return -1;
+};
+
+var pairs = trainxy.map(function(a,i){
+  return [Number(a[0]), Number(a[1]), Number(trainc[i])];
+});
+
+showScatterPlot(pairs);
+
+function showScatterPlot(data) {
+    // just to have some space around items. 
+    var margins = {
+      "left": 50,
+      "right": 50,
+      "top": 50,
+      "bottom": 50
+    };
+    
+    var width = 500;
+    var height = 500;
+    
+    // this will be our colour scale. An Ordinal scale.
+    var colors = d3.scale.category10();
+
+    // we add the SVG component to the scatter-load div
+    var svg = d3.select("#scatter-load").append("svg").attr("width", width).attr("height", height)
+
+    var rad = svg
+      .append('defs')
+        .append("radialGradient")
+          .attr('id','radialBlue')
+          .attr('cx', '50%')
+          .attr('r', '50%')
+          .attr('fx', '50%')
+          .attr('fy', '50%');
+    rad.append('stop')
+            .attr('offset', '0%')
+            .style('stop-color', 'blue')
+            .style('stop-opacity', '1');
+    rad.append('stop')
+          .attr('offset', '100%')
+          .style('stop-color', 'blue')
+          .style('stop-opacity', '0');
+
+    var rads = svg
+      .append('defs')
+        .append("radialGradient")
+          .attr('id','radialRed')
+          .attr('cx', '50%')
+          .attr('r', '50%')
+          .attr('fx', '50%')
+          .attr('fy', '50%');
+    rads.append('stop')
+            .attr('offset', '0%')
+            .style('stop-color', 'red')
+            .style('stop-opacity', '1');
+    rads.append('stop')
+          .attr('offset', '100%')
+          .style('stop-color', 'red')
+          .style('stop-opacity', '0');
+
+    svg = svg.append("g")
+        .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
+
+
+    // this sets the scale that we're using for the X axis. 
+    // the domain define the min and max variables to show. In this case, it's the min and max prices of items.
+    // this is made a compact piece of code due to d3.extent which gives back the max and min of the price variable within the dataset
+    var x = d3.scale.linear()
+        .domain(d3.extent(data, function (d) {
+          return d[0]; 
+        }))
+    // the range maps the domain to values from 0 to the width minus the left and right margins (used to space out the visualization)
+        .range([0, width - margins.left - margins.right]);
+
+    // this does the same as for the y axis but maps from the rating variable to the height to 0. 
+    var y = d3.scale.linear()
+        .domain(d3.extent(data, function (d) {
+          return d[1];
+        }))
+    // Note that height goes first due to the weird SVG coordinate system
+        .range([height - margins.top - margins.bottom, 0]);
+
+    // we add the axes SVG component. At this point, this is just a placeholder. The actual axis will be added in a bit
+    svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + y.range()[0] + ")");
+    svg.append("g").attr("class", "y axis");
+
+    // this is our X axis label. Nothing too special to see here.
+    svg.append("text")
+        .attr("fill", "#414241")
+        .attr("text-anchor", "end")
+        .attr("x", width / 2)
+        .attr("y", height - 35)
+
+
+    // this is the actual definition of our x and y axes. The orientation refers to where the labels appear - for the x axis, below or above the line, and for the y axis, left or right of the line. Tick padding refers to how much space between the tick and the label. There are other parameters too - see https://github.com/mbostock/d3/wiki/SVG-Axes for more information
+    var xAxis = d3.svg.axis().scale(x).orient("bottom").tickPadding(2);
+    var yAxis = d3.svg.axis().scale(y).orient("left").tickPadding(2);
+
+    // this is where we select the axis we created a few lines earlier. See how we select the axis item. in our svg we appended a g element with a x/y and axis class. To pull that back up, we do this svg select, then 'call' the appropriate axis object for rendering.    
+    svg.selectAll("g.y.axis").call(yAxis);
+    svg.selectAll("g.x.axis").call(xAxis);
+
+    // now, we can get down to the data part, and drawing stuff. We are telling D3 that all nodes (g elements with class node) will have data attached to them. The 'key' we use (to let D3 know the uniqueness of items) will be the name. Not usually a great key, but fine for this example.
+    var chocolate = svg.selectAll("g.node").data(data);
+
+    // we 'enter' the data, making the SVG group (to contain a circle and text) with a class node. This corresponds with what we told the data it should be above.
+    
+    var chocolateGroup = chocolate.enter().append("g").attr("class", "node")
+    // this is how we set the position of the items. Translate is an incredibly useful function for rotating and positioning items 
+    .attr('transform', function (d) {
+        return "translate(" + x(d[0]) + "," + y(d[1]) + ")";
+    });
+
+    // we add our first graphics element! A circle! 
+    chocolateGroup.append("circle")
+        .attr("r", 20)
+        .attr("class", "dot")
+        .style("fill", function (d) {
+            // remember the ordinal scales? We use the colors scale to get a colour for our manufacturer. Now each node will be coloured
+            // by who makes the chocolate. 
+            if(d[2] == 1) return "url(#radialBlue)"
+            else return 'url(#radialRed)';
+            // return colors(d[2]);
+    });
+}
+
+createLineChart();
+
+function createLineChart(){ 
+  // Line Chart
+
+  var margin = {top: 20, right: 20, bottom: 30, left: 50},
+      width = 960 - margin.left - margin.right,
+      height = 500 - margin.top - margin.bottom;
+
+  var x = d3.scale.linear()
+      .range([0, width]);
+
+  var y = d3.scale.linear()
+      .range([height, 0]);
+
+  var xAxis = d3.svg.axis()
+      .scale(x)
+      .orient("bottom");
+
+  var yAxis = d3.svg.axis()
+      .scale(y)
+      .orient("left");
+
+  var line = d3.svg.line()
+      .x(function(d) { return x(d[0]); })
+      .y(function(d) { return y(d[1]); })
+      .interpolate("linear");
+
+  var svg = d3.select("body").append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+  calculateErrorForKs();
+  function calculateErrorForKs(){
+
+    var testpairs = testxy.map(function(a,i){
+      return [Number(a[0]), Number(a[1]), Number(testc[i])];
+    });
+
+    var calc = [];
+    for (var k=1;k<300;k++){
+      var numErrors = 0;
+      for (var l=0;l<testpairs.length;l++){
+        if(naiveClosest(k, testpairs[l][0], testpairs[l][1]) != testpairs[l][2])
+          numErrors++;
+      }
+      calc.push([k,numErrors/testpairs.length]);
+    }
+    
+    loadData(calc);
+  }
+
+  function loadData(data){
+    console.log(data);
+    x.domain(d3.extent(data, function(d) { return d[0] }));
+    y.domain([0, d3.max(data, function(d) { return d[1] })]);
+
+    svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis)
+      .append("text")
+        .text("Value of K");
+
+    svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+      .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Percentage of errors");
+
+    svg.append("path")
+      .datum(data)
+      .attr("class", "line")
+      .attr("d", line(data))
+      .attr("stroke", "blue")
+      .attr("stroke-width", 2)
+      .attr("fill", "none");
+  }
+}
+
+</script>
+</body>
+</html>
